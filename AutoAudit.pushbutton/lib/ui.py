@@ -3,81 +3,95 @@ clr.AddReference("System.Windows.Forms")
 clr.AddReference("System.Drawing")
 
 from System.Windows.Forms import (Application, Form, FolderBrowserDialog, Label, Button, TextBox, DialogResult,
-                                  FormBorderStyle, FormStartPosition)
-from System.Drawing import Point, Size
+                                  FormBorderStyle, FormStartPosition, TableLayoutPanel, FlowLayoutPanel, GroupBox,
+                                  AutoSizeMode, Padding)
+from System.Drawing import Point, Size, Color
+
+from __init__ import logger  # Import the logger from __init__.py
 
 class SimpleForm(Form):
     def __init__(self):
         self.initialize_components()
 
     def initialize_components(self):
-        self.Text = "Test UI Form"
-        self.ClientSize = Size(280, 240)
+        # Set form properties
+        self.Text = "AutoAudit"
+        self.ClientSize = Size(250, 250)
         self.FormBorderStyle = FormBorderStyle.FixedDialog
         self.MaximizeBox = False
         self.MinimizeBox = False
         self.StartPosition = FormStartPosition.CenterScreen
+        self.BackColor = Color.LightGray
+
+        # Create a TableLayoutPanel to organize the controls
+        layout_panel = TableLayoutPanel()
+        layout_panel.RowCount = 5
+        layout_panel.ColumnCount = 2
+        layout_panel.AutoSize = True
+        layout_panel.AutoSizeMode = AutoSizeMode.GrowAndShrink
 
         # Folder picker button
-        self.folderButton = Button()
-        self.folderButton.Text = 'Pick Folder'
-        self.folderButton.Location = Point(10, 10)
-        self.folderButton.Click += self.folder_button_click
-        self.Controls.Add(self.folderButton)
+        browse_folder_button = Button()
+        browse_folder_button.Text = 'Browse Folder'  # Shorter text for smaller button
+        browse_folder_button.AutoSize = False  # Disable AutoSize
+        browse_folder_button.Size = Size(120, 30)  # Set the desired size
+        browse_folder_button.Click += self.browse_folder_button_click
+        layout_panel.Controls.Add(browse_folder_button, 0, 0)
 
         # Label to display selected folder path
-        self.folderPathLabel = Label()
-        self.folderPathLabel.Location = Point(10, 40)
-        self.folderPathLabel.Size = Size(260, 40)
-        self.Controls.Add(self.folderPathLabel)
+        self.folder_path_label = Label()
+        self.folder_path_label.AutoSize = True
+        layout_panel.Controls.Add(self.folder_path_label, 0, 1)
 
-        # Entry for the warning file name
-        self.warning_label = Label()
-        self.warning_label.Text = "Enter warning file name:"
-        self.warning_label.Location = Point(10, 90)
-        self.warning_label.AutoSize = True
-        self.Controls.Add(self.warning_label)
+        # Warning file name label and input
+        warning_label = Label()
+        warning_label.Text = "Warning File:"
+        layout_panel.Controls.Add(warning_label, 0, 2)
 
-        self.warningInput = TextBox()
-        self.warningInput.Text = "warning_info.csv"
-        self.warningInput.Location = Point(10, 110)
-        self.warningInput.Width = 260
-        self.warningInput.TextChanged += self.input_text_changed
-        self.Controls.Add(self.warningInput)
+        self.warning_input = TextBox()
+        self.warning_input.Text = "warning_info.csv"
+        self.warning_input.AutoSize = False  # Disable AutoSize
+        self.warning_input.Size = Size(150, 20)  # Set the desired size
+        self.warning_input.TextChanged += self.input_text_changed
+        layout_panel.Controls.Add(self.warning_input, 0, 3)
 
-        # Entry for the basic file name
-        self.basic_label = Label()
-        self.basic_label.Text = "Enter audit info file name:"
-        self.basic_label.Location = Point(10, 140)
-        self.basic_label.AutoSize = True
-        self.Controls.Add(self.basic_label)
+        # Audit file name label and input
+        audit_label = Label()
+        audit_label.Text = "Audit File:"
+        layout_panel.Controls.Add(audit_label, 0, 4)
 
-        self.basicInput = TextBox()
-        self.basicInput.Text = "audit_info.csv"
-        self.basicInput.Location = Point(10, 160)
-        self.basicInput.Width = 260
-        self.basicInput.TextChanged += self.input_text_changed
-        self.Controls.Add(self.basicInput)
+        self.audit_input = TextBox()
+        self.audit_input.Text = "audit_info.csv"
+        self.audit_input.AutoSize = False  # Disable AutoSize
+        self.audit_input.Size = Size(150, 20)  # Set the desired size
+        self.audit_input.TextChanged += self.input_text_changed
+        layout_panel.Controls.Add(self.audit_input, 0, 5)
 
-        # Submit button
-        self.submitButton = Button()
-        self.submitButton.Text = 'Submit'
-        self.submitButton.Location = Point(10, 190)
-        self.submitButton.Enabled = False  # Initially disabled
-        self.submitButton.Click += self.submit_button_click
-        self.Controls.Add(self.submitButton)
+        # Action buttons
+        button_panel = FlowLayoutPanel()
+        button_panel.Padding = Padding(5)
 
-        # Cancel button
-        self.cancelButton = Button()
-        self.cancelButton.Text = 'Cancel'
-        self.cancelButton.Location = Point(180, 190)
-        self.cancelButton.Click += lambda sender, args: self.Close()
-        self.Controls.Add(self.cancelButton)
+        self.submit_button = Button()
+        self.submit_button.Text = 'Submit'
+        self.submit_button.Enabled = False
+        self.submit_button.Click += self.submit_button_click
+        button_panel.Controls.Add(self.submit_button)
 
-    def folder_button_click(self, sender, args):
+        cancel_button = Button()
+        cancel_button.Text = 'Cancel'
+        cancel_button.Click += lambda sender, args: self.Close()
+        button_panel.Controls.Add(cancel_button)
+
+        layout_panel.Controls.Add(button_panel, 0, 7)
+        layout_panel.SetColumnSpan(button_panel, 7)  # Span the button panel across both columns
+
+        # Add the layout panel to the form
+        self.Controls.Add(layout_panel)
+
+    def browse_folder_button_click(self, sender, args):
         dialog = FolderBrowserDialog()
         if dialog.ShowDialog() == DialogResult.OK:
-            self.folderPathLabel.Text = dialog.SelectedPath
+            self.folder_path_label.Text = dialog.SelectedPath
             self.input_text_changed(None, None)
 
     def submit_button_click(self, sender, args):
@@ -86,13 +100,10 @@ class SimpleForm(Form):
 
     def input_text_changed(self, sender, args):
         # Enable the submit button only if all fields are filled
-        self.submitButton.Enabled = (self.folderPathLabel.Text != "" and
-                                     self.warningInput.Text.strip() != "" and
-                                     self.basicInput.Text.strip() != "")
-        
-    def CancelButton_Click(self, sender, event):
-        self.DialogResult = DialogResult.Cancel
-        self.Close()
+        self.submit_button.Enabled = (self.folder_path_label.Text != "" and
+                                      self.warning_input.Text.strip() != "" and
+                                      self.audit_input.Text.strip() != "")
+        logger.debug(f"Submit button enabled: {self.submit_button.Enabled}")
 
 def show_ui():
     Application.EnableVisualStyles()
@@ -100,9 +111,13 @@ def show_ui():
     result = form.ShowDialog()
 
     if result == DialogResult.OK:
-        return {
-            'output_dir': form.folderPathLabel.Text,
-            'warning_file_name': form.warningInput.Text,
-            'basic_file_name': form.basicInput.Text
+        user_inputs = {
+            'output_dir': form.folder_path_label.Text,
+            'warning_file_name': form.warning_input.Text,
+            'audit_file_name': form.audit_input.Text
         }
-    return None
+        logger.debug(f"User inputs: {user_inputs}")
+        return user_inputs
+    else:
+        logger.warning("User cancelled the input.")
+        return None
