@@ -1,3 +1,28 @@
+"""
+__title__ = "AutoAudit"
+__doc__ = """Version = 1.1
+Date    = 06.06.2024
+_____________________________________________________________________
+Description:
+This is a template file for pyRevit Scripts.
+_____________________________________________________________________
+How-to:
+-> Click on the button
+-> Change Settings(optional)
+-> Make a change
+_____________________________________________________________________
+Last update:
+- [24.04.2024] - 1.0 RELEASE
+- [06.06.2024] - 1.1 UPDATE - ANNOTATION
+_____________________________________________________________________
+Author: Ben Lin - Preformance
+"""
+
+__author__ = "Preformance"
+__min_revit_ver__ = 2021
+__max_revit_ver = 2023
+"""
+
 import clr
 import csv
 import os
@@ -8,8 +33,8 @@ clr.AddReference('RevitAPI')
 clr.AddReference('RevitServices')
 from Autodesk.Revit.DB import *
 from RevitServices.Persistence import DocumentManager
-
 from __init__ import logger  # Import the logger from __init__.py
+
 
 def generate_table_html(data, fieldnames, max_rows=10):
     """
@@ -26,9 +51,11 @@ def generate_table_html(data, fieldnames, max_rows=10):
     table_html = "<table>"
     table_html += "<tr><th>{}</th><th>{}</th><th>{}</th></tr>".format(*fieldnames)
     for row in deque(data, maxlen=max_rows):
-        table_html += "<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(row['Document Title'], row['Warning Descriptions'], row['Related Elements'])
+        table_html += "<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+            row['Document Title'], row['Warning Descriptions'], row['Related Elements'])
     table_html += "</table>"
     return table_html
+
 
 def collect_warning_data(docs, output_dir, file_name):
     """
@@ -50,7 +77,7 @@ def collect_warning_data(docs, output_dir, file_name):
         if doc:
             try:
                 warnings = doc.GetWarnings()
-                workset_table = doc.GetWorksetTable()  # Get the workset table from the document
+                workset_table = doc.GetWorksetTable()
 
                 for warning in warnings:
                     description = warning.GetDescriptionText()
@@ -62,18 +89,19 @@ def collect_warning_data(docs, output_dir, file_name):
                         if elem:
                             category = elem.Category.Name if elem.Category else "No Category"
                             try:
-                                name = elem.Name  # Try to access the Name property directly
-                            except TypeError:  # Handles cases where elem.Name is not accessible
-                                name = elem.LookupParameter("Name").AsString() if elem.LookupParameter("Name") else "Not a Name"
-                                if not name:  # Fallback if parameter is None or empty
+                                name = elem.Name
+                            except TypeError:
+                                name = elem.LookupParameter(
+                                    "Name").AsString() if elem.LookupParameter("Name") else "Not a Name"
+                                if not name:
                                     name = "Not a Name"
 
-                            # Retrieve workset information
                             workset_id = elem.WorksetId
                             workset = workset_table.GetWorkset(workset_id)
                             workset_name = workset.Name if workset else "No Workset"
 
-                            elements_detail.append(f"{workset_name}: <{category}> {name}: [{elem_id}]")
+                            elements_detail.append(
+                                f"{workset_name}: <{category}> {name}: [{elem_id}]")
 
                     related_elements = '; \n '.join(elements_detail)
                     data.append({
@@ -86,7 +114,6 @@ def collect_warning_data(docs, output_dir, file_name):
         else:
             logger.warning("Encountered a null document; skipping.")
 
-    # Write data to CSV
     try:
         with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -94,10 +121,10 @@ def collect_warning_data(docs, output_dir, file_name):
             writer.writerows(data)
     except PermissionError:
         logger.error(f"Error: You don't have permission to write to {output_path}")
-        return
+        return f"Error: You don't have permission to write to {output_path}"
     except Exception as e:
         logger.error(f"Error: Failed to export CSV. {str(e)}")
-        return
+        return f"Error: Failed to export CSV. {str(e)}"
 
     table_html = generate_table_html(data, fieldnames)
     heading = "<h3>Top Entries</h3>" if table_html else ""
