@@ -14,7 +14,8 @@ from lib import (
     SurveyAnalyzer,
     logger
 )
-from lib.ui import show_dialog, show_data_preview
+from lib.ui import show_dialog, show_data_preview, show_coordinate_system_dialog
+from lib.unit_utils import normalize_coordinate_system
 from pyrevit import forms
 
 doc = __revit__.ActiveUIDocument.Document
@@ -37,14 +38,22 @@ def combine_data_for_csv(grid_data, level_data, survey_data):
         host_levels = next((data for data in level_data if data['Document Name'] == host_name), None)
         host_survey = next((data for data in survey_data if data['Document Name'] == host_name), None)
         
+        # Format True North to 3 decimal places if it's a number
+        true_north = host_survey['True North Angle'] if host_survey else 'No Data'
+        if true_north != 'No Data':
+            try:
+                true_north = f"{float(true_north):.3f}"
+            except (ValueError, TypeError):
+                pass
+        
         combined_data.append({
-            'Document Type': 'Host',
             'Document Name': host_name,
-            'True North': host_doc.get('true_north', 'No Data'),
-            'Grid Data': host_doc.get('grid_data', 'No Data'),
-            'Level Data': host_levels['Level Data'] if host_levels else 'No Data',
-            'Survey Point': host_survey['Survey Coordinate'] if host_survey else 'No Data',
+            'Document Type': 'Host',
             'Project Base Point': host_survey['Project Base Coordinate'] if host_survey else 'No Data',
+            'True North': true_north,
+            'Survey Point': host_survey['Survey Coordinate'] if host_survey else 'No Data',
+            'Level Data': host_levels['Level Data'] if host_levels else 'No Data',
+            'Grid Data': host_doc.get('grid_data', 'No Data'),
         })
     
     # Process linked documents
@@ -54,14 +63,22 @@ def combine_data_for_csv(grid_data, level_data, survey_data):
             link_levels = next((data for data in level_data if data['Document Name'] == doc_name), None)
             link_survey = next((data for data in survey_data if data['Document Name'] == doc_name), None)
             
+            # Format True North to 3 decimal places if it's a number
+            true_north = link_survey['True North Angle'] if link_survey else 'No Data'
+            if true_north != 'No Data':
+                try:
+                    true_north = f"{float(true_north):.3f}"
+                except (ValueError, TypeError):
+                    pass
+            
             combined_data.append({
-                'Document Type': 'Linked',
                 'Document Name': doc_name,
-                'True North': link_data.get('true_north', 'No Data'),
-                'Grid Data': link_data.get('grid_data', 'No Data'),
-                'Level Data': link_levels['Level Data'] if link_levels else 'No Data',
-                'Survey Point': link_survey['Survey Coordinate'] if link_survey else 'No Data',
+                'Document Type': 'Linked',
                 'Project Base Point': link_survey['Project Base Coordinate'] if link_survey else 'No Data',
+                'True North': true_north,
+                'Survey Point': link_survey['Survey Coordinate'] if link_survey else 'No Data',
+                'Level Data': link_levels['Level Data'] if link_levels else 'No Data',
+                'Grid Data': link_data.get('grid_data', 'No Data'),
             })
     
     return combined_data
@@ -69,9 +86,20 @@ def combine_data_for_csv(grid_data, level_data, survey_data):
 def write_csv_data(data, filepath):
     """Write data to CSV file"""
     try:
+        # Define field order explicitly
+        fieldnames = [
+            'Document Name',
+            'Document Type',
+            'Project Base Point',
+            'True North',
+            'Survey Point',
+            'Level Data',
+            'Grid Data'
+        ]
+        
         with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
             csvfile.write('\ufeff')  # UTF-8 BOM for Excel
-            writer = csv.DictWriter(csvfile, fieldnames=data[0].keys())
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(data)
         return True
@@ -82,13 +110,21 @@ def write_csv_data(data, filepath):
 def process_document():
     """Process the active document and its linked documents"""
     try:
+        # First, ask the user to select a coordinate system
+        coordinate_system = show_coordinate_system_dialog()
+        if not coordinate_system:
+            logger.info("Operation cancelled - no coordinate system selected")
+            return False
+            
+        logger.info(f"Selected coordinate system: {coordinate_system}")
+        
         # Initialize analyzers
         grid_analyzer = GridAnalyzer(doc)
         level_analyzer = LevelAnalyzer(doc)
         survey_analyzer = SurveyAnalyzer(doc)
 
-        # Collect data
-        grid_data = grid_analyzer.collect_all_grid_data()
+        # Collect data using the selected coordinate system
+        grid_data = grid_analyzer.collect_all_grid_data(coordinate_system)
         level_data = level_analyzer.collect_all_level_data()
         survey_data = survey_analyzer.collect_all_survey_data()
 
@@ -97,8 +133,8 @@ def process_document():
         level_csv_data = level_analyzer.format_for_csv(level_data)
         survey_csv_data = survey_analyzer.format_for_csv(survey_data)
 
-        # Show preview
-        preview_result = show_data_preview(grid_csv_data, level_csv_data, survey_csv_data)
+        # Show preview with the selected coordinate system
+        preview_result = show_data_preview(grid_csv_data, level_csv_data, survey_csv_data, coordinate_system)
         if not preview_result:
             logger.info("Operation cancelled after preview")
             return False
@@ -116,15 +152,18 @@ def process_document():
 
         # Combine and write data
         combined_data = combine_data_for_csv(grid_data, level_csv_data, survey_csv_data)
-        combined_path = os.path.join(output_dir, 'document_audit_data.csv')
+        
+        # Create filename with coordinate system indicator
+        coordinate_system = normalize_coordinate_system(coordinate_system)
+        combined_path = os.path.join(output_dir, f'document_audit_data_{coordinate_system}.csv')
         
         if write_csv_data(combined_data, combined_path):
             forms.alert(
                 'Document audit completed successfully.',
                 title='Success',
-                sub_msg='Data has been exported to the selected directory.'
+                sub_msg=f'Data has been exported to: {combined_path}'
             )
-            logger.info("Document audit completed successfully")
+            logger.info(f"Document audit completed successfully: {combined_path}")
             return True
         else:
             forms.alert(
