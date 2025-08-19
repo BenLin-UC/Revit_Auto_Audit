@@ -78,13 +78,13 @@ Log files rotate when they reach 1MB, with up to 5 backup files maintained.
 The tool generates two CSV files:
 
 ### warning_info.csv
-- Document Title
+- Document Name
 - Document Type (Host/Linked)
 - Warning Descriptions 
 - Related Elements (with Workset, Category, Name, and ID information)
 
 ### audit_info.csv
-- Document Title
+- Document Name
 - Document Type (Host/Linked)
 - Purgeable Elements Count
 - Detail Groups Count
